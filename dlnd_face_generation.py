@@ -149,16 +149,22 @@ def discriminator(images, reuse=False):
     # TODO: Implement Function
     alpha = 0.1 
     with tf.variable_scope('discriminator', reuse=reuse):
-        conv1 = tf.layers.conv2d(images, 64, 3, strides=2, padding='same')
+        conv1 = tf.layers.conv2d(images, 64, 3, strides=2, padding='same',
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
         conv1 = tf.maximum(alpha*conv1, conv1)
+        conv1 = tf.nn.dropout(conv1,0.8)
         
-        conv2 = tf.layers.conv2d(conv1, 128, 3, strides=2, padding='same')
+        conv2 = tf.layers.conv2d(conv1, 128, 3, strides=2, padding='same',
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
         conv2 = tf.layers.batch_normalization(conv2, training=True)
         conv2 = tf.maximum(alpha*conv2, conv2)
+        conv2 = tf.nn.dropout(conv2,0.8)
         
-        conv3 = tf.layers.conv2d(conv2, 256, 3, strides=2, padding='same')
+        conv3 = tf.layers.conv2d(conv2, 256, 3, strides=2, padding='same',
+                                 kernel_initializer=tf.contrib.layers.xavier_initializer())
         conv3 = tf.layers.batch_normalization(conv3, training=True)
         conv3 = tf.maximum(alpha*conv3, conv3)
+        conv3 = tf.nn.dropout(conv3,0.8)
         
         size = conv3.get_shape().as_list()
         n = size[1] * size[2] * size[3]
@@ -194,13 +200,17 @@ def generator(z, out_channel_dim, is_train=True):
         x1 = tf.reshape(x1, [-1, 3, 3, 256])    
         x1 = tf.maximum(alpha*x1, x1)
         
-        x2 = tf.layers.conv2d_transpose(x1, 128, 3, strides=2, padding='valid')
+        x2 = tf.layers.conv2d_transpose(x1, 128, 3, strides=2, padding='valid',
+                                        kernel_initializer=tf.contrib.layers.xavier_initializer())
         x2 = tf.layers.batch_normalization(x2, training=is_train)
         x2 = tf.maximum(alpha*x2, x2)
+        x2 = tf.nn.dropout(x2,0.8)
         
-        x3 = tf.layers.conv2d_transpose(x2, 64, 3, strides=2, padding='same')
+        x3 = tf.layers.conv2d_transpose(x2, 64, 3, strides=2, padding='same',
+                                        kernel_initializer=tf.contrib.layers.xavier_initializer())
         x3 = tf.layers.batch_normalization(x3, training=is_train)
         x3 = tf.maximum(alpha*x3, x3)
+        x3 = tf.nn.dropout(x3,0.8)
         
         logits = tf.layers.conv2d_transpose(x3, out_channel_dim, 3, strides=2, padding='same', activation=None)
         logits = tf.tanh(logits)
@@ -234,11 +244,14 @@ def model_loss(input_real, input_z, out_channel_dim):
     d_model_real,d_logits_real = discriminator(input_real)
     d_model_fake,d_logits_fake = discriminator(g_model,reuse=True)
     
-    d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_real,labels=tf.ones_like(d_model_real)))
-    d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake,labels=tf.zeros_like(d_model_fake)))
+    d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_real,
+                                                                         labels=tf.ones_like(d_model_real) * (1-0.1)))
+    d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake,
+                                                                         labels=tf.zeros_like(d_model_fake)))
     d_loss = d_loss_real + d_loss_fake
 
-    g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake,labels=tf.ones_like(d_model_fake))) 
+    g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=d_logits_fake,
+                                                                    labels=tf.ones_like(d_model_fake))) 
     
     return d_loss, g_loss
 
@@ -357,7 +370,7 @@ def train(epoch_count, batch_size, z_dim, learning_rate, beta1, get_batches, dat
                 steps += 1
 
                 batch_z = np.random.uniform(-1,1,size=(batch_size,z_dim))
-                batch_images = np.tanh(batch_images)
+                batch_images = batch_images*2
                 _ = sess.run(d_train_opt,feed_dict = {input_real:batch_images,input_z:batch_z})
                 _ = sess.run(g_train_opt,feed_dict = {input_real:batch_images,input_z:batch_z})
                 
@@ -377,12 +390,12 @@ def train(epoch_count, batch_size, z_dim, learning_rate, beta1, get_batches, dat
 # ### MNIST
 # Test your GANs architecture on MNIST.  After 2 epochs, the GANs should be able to generate images that look like handwritten digits.  Make sure the loss of the generator is lower than the loss of the discriminator or close to 0.
 
-# In[13]:
+# In[12]:
 
-batch_size = 128
+batch_size = 64
 z_dim = 100
 learning_rate = 0.001
-beta1 = 0.5
+beta1 = 0.4
 
 
 """
@@ -399,12 +412,12 @@ with tf.Graph().as_default():
 # ### CelebA
 # Run your GANs on CelebA.  It will take around 20 minutes on the average GPU to run one epoch.  You can run the whole epoch or stop when it starts to generate realistic faces.
 
-# In[14]:
+# In[13]:
 
-batch_size = 128
+batch_size = 32
 z_dim = 100
 learning_rate = 0.001
-beta1 = 0.5
+beta1 = 0.4
 
 
 """
@@ -420,3 +433,8 @@ with tf.Graph().as_default():
 
 # ### Submitting This Project
 # When submitting this project, make sure to run all the cells before saving the notebook. Save the notebook file as "dlnd_face_generation.ipynb" and save it as a HTML file under "File" -> "Download as". Include the "helper.py" and "problem_unittests.py" files in your submission.
+
+# In[ ]:
+
+
+
